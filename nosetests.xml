@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?><testsuite name="nosetests" tests="3" errors="0" failures="0" skip="0"><testcase classname="Components.dbtests" name="test_dbconnect" time="0.016"><system-out><![CDATA[Test for missing database.
+Test for default database.
+Test empty database create.
+]]></system-out></testcase><testcase classname="Components.dbtests" name="test_getnextid" time="0.000"><system-out><![CDATA[Testing getnextid.
+]]></system-out></testcase><testcase classname="Components.dbtests" name="test_getid" time="0.000"><system-out><![CDATA[Testing getid.
+]]></system-out></testcase></testsuite>
