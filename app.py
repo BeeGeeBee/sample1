@@ -34,6 +34,10 @@ con=dbconnect()
 app = Flask(__name__)
 app.config.from_object('config')
 
+#@app.errorhandler(500)
+#def internal_error(exception):
+#	app.logger.error(exception)
+#	return render_template('500.html'), 500
 
 @app.route('/')
 def index():
