@@ -21,7 +21,7 @@ class Category(object):
         self.componentid = []
 
 
-engine = create_engine('sqlite:///database//components.db', echo=True)
+engine = create_engine('sqlite:///database//components.db', echo=False)
 Base.metadata.bind = engine
 
 from sqlalchemy.orm import sessionmaker
@@ -32,7 +32,7 @@ session = DBSession()
 con=dbconnect()
 
 app = Flask(__name__)
-app.config.from_object('config')
+#app.config.from_object('config')
 
 #@app.errorhandler(500)
 #def internal_error(exception):
