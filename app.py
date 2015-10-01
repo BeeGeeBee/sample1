@@ -1,13 +1,19 @@
-__author__ = 'Bernard'
-
+import os
 from flask import Flask, render_template, request, send_file, redirect, url_for
 from forms import ComponentsForm
 from models import Components, Base, Locations, Suppliers, Categories, Definitions, Features
 from sqlalchemy import create_engine, func
+from sqlalchemy.orm import sessionmaker
 from componentsmodule import dbconnect
 
 
+__author__ = 'Bernard'
+
+
 class Category(object):
+    '''
+    Define Category class to keep track of category searches
+    '''
     def __init__(self):
         self.id = []
         self.name = []
@@ -21,32 +27,57 @@ class Category(object):
         self.componentid = []
 
 
-engine = create_engine('sqlite:///database//components.db', echo=False)
+# Connect to database (for sqlite)
+engine = create_engine('sqlite:///database//components.db', echo=True)
 Base.metadata.bind = engine
-
-from sqlalchemy.orm import sessionmaker
 
 DBSession = sessionmaker()
 DBSession.bind = engine
 session = DBSession()
-con=dbconnect()
 
 app = Flask(__name__)
-#app.config.from_object('config')
 
-#@app.errorhandler(500)
-#def internal_error(exception):
-#	app.logger.error(exception)
-#	return render_template('500.html'), 500
+# Load default config and override config from an environment variable
+app.config.update(dict(
+    DATABASE=os.path.join(app.root_path, 'database/components.db'),
+    DEBUG=True,
+    SECRET_KEY='development key',
+))
+app.config.from_envvar('APP_SETTINGS', silent=True)
+con = dbconnect()
+
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
 
-@app.route('/showlist/<filtered>')
-def showlist(filtered=None):
-    form = ComponentsForm(request.form)
+def create_query(filtered=1):
+    '''
+    Build a query object depending on whether it is a filtered query or not
+    :param filtered:
+    :return: orm query object
+    '''
+    if filtered == '1':
+        query_obj = session.query(Components.ID, Components.Name, Components.CurrentStock, Components.ReorderLevel,
+                        Components.UnitPrice, Suppliers.Name, Locations.Name, Components.Datasheet). \
+                        outerjoin(Suppliers, Components.SuppliersID == Suppliers.ID). \
+                        outerjoin(Locations, Components.LocationsID == Locations.ID). \
+                        filter(Components.CurrentStock <= Components.ReorderLevel). \
+                        filter(Components.ReorderLevel != ""). \
+                        order_by(Components.Name)
+    else:
+        query_obj = session.query(Components.ID, Components.Name, Components.CurrentStock,
+                        Components.ReorderLevel, Components.UnitPrice, Suppliers.Name, Locations.Name,
+                        Components.Datasheet). \
+                        outerjoin(Suppliers, Components.SuppliersID == Suppliers.ID). \
+                        outerjoin(Locations, Components.LocationsID == Locations.ID). \
+                        order_by(Components.Name)
+    return query_obj
+
+
+def init_form():
+    form = ComponentsForm()
     form.name.value = []
     form.id.value = []
     form.currentstock.value = []
@@ -55,47 +86,26 @@ def showlist(filtered=None):
     form.supplier.value = []
     form.location.value = []
     form.datasheet.value = []
-    if filtered == "1":
-        for (componentid, name, currentstock, reorderlevel, unitprice, supplier, location, datasheet) in \
-                session.query(Components.ID, Components.Name, Components.CurrentStock, Components.ReorderLevel,
-                              Components.UnitPrice, Suppliers.Name, Locations.Name, Components.Datasheet). \
-                outerjoin(Suppliers, Components.SuppliersID == Suppliers.ID). \
-                outerjoin(Locations, Components.LocationsID == Locations.ID). \
-                filter(Components.CurrentStock <= Components.ReorderLevel). \
-                filter(Components.ReorderLevel != ""). \
-                order_by(Components.Name):
-            form.id.value.append(componentid)
-            form.name.value.append(name)
-            form.currentstock.value.append(currentstock)
-            form.reorderlevel.value.append(reorderlevel)
-            form.unitprice.value.append(unitprice)
-            form.supplier.value.append('')
-            if supplier:
-                form.supplier.value[-1] = supplier
-            form.location.value.append('')
-            if location:
-                form.location.value[-1] = location
-            form.datasheet.value.append(datasheet)
-    else:
-        for (componentid, name, currentstock, reorderlevel, unitprice, supplier, location, datasheet) in \
-                session.query(Components.ID, Components.Name, Components.CurrentStock,
-                              Components.ReorderLevel, Components.UnitPrice, Suppliers.Name, Locations.Name,
-                              Components.Datasheet)\
-                .outerjoin(Suppliers, Components.SuppliersID == Suppliers.ID)\
-                .outerjoin(Locations, Components.LocationsID == Locations.ID)\
-                .order_by(Components.Name):
-            form.id.value.append(componentid)
-            form.name.value.append(name)
-            form.currentstock.value.append(currentstock)
-            form.reorderlevel.value.append(reorderlevel)
-            form.unitprice.value.append(unitprice)
-            form.supplier.value.append('')
-            if supplier:
-                form.supplier.value[-1] = supplier
-            form.location.value.append('')
-            if location:
-                form.location.value[-1] = location
-            form.datasheet.value.append(datasheet)
+    return form
+
+
+@app.route('/showlist/<filtered>')
+def showlist(filtered=None):
+    form = init_form()
+    query_obj = create_query(filtered=filtered)
+    for (componentid, name, currentstock, reorderlevel, unitprice, supplier, location, datasheet) in query_obj:
+        form.id.value.append(componentid)
+        form.name.value.append(name)
+        form.currentstock.value.append(currentstock)
+        form.reorderlevel.value.append(reorderlevel)
+        form.unitprice.value.append(unitprice)
+        form.supplier.value.append('')
+        if supplier:
+            form.supplier.value[-1] = supplier
+        form.location.value.append('')
+        if location:
+            form.location.value[-1] = location
+        form.datasheet.value.append(datasheet)
     return render_template('showlist.html', form=form, numrows=len(form.name.value))
 
 
@@ -106,15 +116,6 @@ def show_pdf(docid=None):
 
 
 catsearch = Category()
-
-
-@app.route('/signup', methods=['GET', 'POST'])
-def signup():
-    if request.method == 'POST':
-        email = request.form['email']
-        print("The email address is '" + email + "'")
-        return redirect(url_for('index'))
-    return render_template('signup.html')
 
 
 @app.route('/showcomponents/<componentid>', methods=['POST', 'GET'])
